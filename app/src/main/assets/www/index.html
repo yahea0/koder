@@ -924,13 +924,27 @@ function refreshPreview(){
     try{rPrev.innerHTML=`<pre>${esc(JSON.stringify(JSON.parse(f.content),null,2))}</pre>`}catch(e){rPrev.innerHTML=`<div style="color:var(--err);font-family:monospace">${esc(e.message)}</div>`}
   }else{
     rPrev.style.display="none";pFrame.style.display="block";
-    const hf=state.files.find(x=>x.lang==="html")||f,css=state.files.filter(x=>x.lang==="css").map(x=>`<style>\n${x.content}\n</style>`).join("\n"),js=state.files.filter(x=>x.lang==="js").map(x=>`<script>\n${x.content.replace(/<\/script>/gi,"<\\/script>")}\n<\/script>`).join("\n");
+    const fname=f.path.split("/").pop();
+    const hf=f.lang==="html"?f:(state.files.find(x=>x.lang==="html"&&x.content.includes(fname))||state.files.find(x=>x.lang==="html")||f);
     $("previewUrlLabel").textContent="http://localhost:8080/"+hf.path;
+    const findRef=(ref,lang)=>{
+      const clean=ref.replace(/^\.?\//,"").split("?")[0].split("#")[0];
+      const base=clean.split("/").pop();
+      return state.files.find(x=>x.lang===lang&&(x.path===clean||x.path.endsWith("/"+clean)||x.path.split("/").pop()===base));
+    };
     const br=`<script>(function(){const s=(l,a)=>parent.postMessage({type:"pc-con",l,t:Array.from(a).map(x=>typeof x==="object"?JSON.stringify(x):String(x)).join(" ")},"*");const ol=console.log,oe=console.error;console.log=function(){ol.apply(console,arguments);s("ok",arguments)};console.error=function(){oe.apply(console,arguments);s("err",arguments)};window.onerror=function(m,sr,ln){s("err",[m+" (L"+ln+")"])}})();<\/script>`;
-    let doc=hf.lang==="html"?hf.content:`<body><pre>${esc(f.content)}</pre></body>`;
-    doc=doc.replace(/<link[^>]*href=["'][^"']*style\.css["'][^>]*>/gi,"").replace(/<script[^>]*src=["'][^"']*app\.js["'][^>]*>\s*<\/script>/gi,"");
-    doc=/<\/head>/i.test(doc)?doc.replace(/<\/head>/i,br+css+"</head>"):br+css+doc;
-    doc=/<\/body>/i.test(doc)?doc.replace(/<\/body>/i,js+"</body>"):doc+js;
+    let doc=hf.lang==="html"?hf.content:(f.lang==="css"?`<!DOCTYPE html><html><head><style>${f.content}</style></head><body><h3>CSS Preview</h3></body></html>`:`<!DOCTYPE html><html><body><pre>${esc(f.content)}</pre><script>${f.content.replace(/<\/script>/gi,"<\\/script>")}<\/script></body></html>`);
+    doc=doc.replace(/<link\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>/gi,(full,href)=>{
+      if(/^https?:\/\//i.test(href)||!/stylesheet|\.css(\?|#|$)/i.test(full))return full;
+      const cf=findRef(href,"css");
+      return cf?`<style>\n${cf.content}\n</style>`:full;
+    });
+    doc=doc.replace(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>\s*<\/script>/gi,(full,src)=>{
+      if(/^https?:\/\//i.test(src))return full;
+      const jf=findRef(src,"js");
+      return jf?`<script>\n${jf.content.replace(/<\/script>/gi,"<\\/script>")}\n<\/script>`:full;
+    });
+    doc=/<\/head>/i.test(doc)?doc.replace(/<\/head>/i,br+"</head>"):(/<body\b/i.test(doc)?doc.replace(/<body\b/i,br+"<body"):br+doc);
     pFrame.srcdoc=doc;
   }
 }
