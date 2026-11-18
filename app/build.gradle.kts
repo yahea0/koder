@@ -41,13 +41,3 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.webkit:webkit:1.12.1")
 }
-
-الخطوة 5: إنشاء ملف قواعد ProGuard لحماية جسر JavaScript
-
-app/proguard-rules.pro
-
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}
--keepattributes JavascriptInterface
--keep class com.yahea0.koder.MainActivity$AndroidBridge { *; }
